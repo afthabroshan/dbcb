@@ -10,18 +10,24 @@ import 'dart:convert';
 // import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ChatPage extends StatefulWidget {
-  const ChatPage({super.key}); // Constructor for ChatPage widget
+  final String username;
+  final String accessData;
+
+  const ChatPage({Key? key, required this.username, required this.accessData})
+      : super(key: key);
 
   @override
-  State<ChatPage> createState() => _ChatPageState(); // Creates state for ChatPage
+  State<ChatPage> createState() => _ChatPageState();
 }
 
 class _ChatPageState extends State<ChatPage> {
   final List<types.Message> messages = []; // Stores chat messages
 
-  // Represents the user sending messages
-  final _user = const types.User(
-      id: '82091008-a484-4a89-ae75-a22bf8d6f3ac'); 
+  // Use the passed username as the user identifier
+  late final types.User _user = types.User(
+    id: widget.username,
+    firstName: widget.username,
+  );
 
   // Represents the AI user in the chat
   final _aiUser = const types.User(
@@ -56,9 +62,8 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _fetchAIResponse(String userInput) async {
     try {
       // Fetches data from the 'employees' table in Supabase
-      final supabaseResponse = await Supabase.instance.client
-          .from('employees')
-          .select();
+      final supabaseResponse =
+          await Supabase.instance.client.from('employees').select();
       log('Supabase Response: $supabaseResponse'); // Logs the response
 
       // Prepares the request body for OpenAI's API
@@ -78,7 +83,7 @@ class _ChatPageState extends State<ChatPage> {
       var apiResponse = await http.post(
         Uri.parse("https://api.openai.com/v1/chat/completions"),
         headers: {
-          // "Authorization": "Bearer ${dotenv.env['OPENAI_API_KEY']}", // API key for authentication
+          // "Authorization": "Bearer # API_KEY", // API key for authentication
           "Content-Type": "application/json", // Specifies content type
         },
         body: jsonEncode(requestBody), // Converts request body to JSON
@@ -86,13 +91,16 @@ class _ChatPageState extends State<ChatPage> {
 
       // Checks if the request was successful
       if (apiResponse.statusCode == 200) {
-        var jsonResponse = jsonDecode(apiResponse.body); // Decodes the JSON response
-        String aiText = jsonResponse['choices'][0]['message']['content']; // Extracts AI's response
+        var jsonResponse =
+            jsonDecode(apiResponse.body); // Decodes the JSON response
+        String aiText = jsonResponse['choices'][0]['message']
+            ['content']; // Extracts AI's response
 
         // Creates a message object for the AI's response
         final aiMessage = types.TextMessage(
           author: _aiUser, // Sets the author to the AI user
-          createdAt: DateTime.now().millisecondsSinceEpoch, // Timestamp for message
+          createdAt:
+              DateTime.now().millisecondsSinceEpoch, // Timestamp for message
           id: const Uuid().v4(), // Generates a unique ID for the message
           text: aiText, // AI's response text
         );
@@ -110,22 +118,33 @@ class _ChatPageState extends State<ChatPage> {
   Widget build(BuildContext context) {
     // Builds the chat interface
     return Scaffold(
+      appBar: AppBar(
+        title: Text('Welcome, ${widget.username}'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Center(child: Text('Access: ${widget.accessData}')),
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(8.0), // Adds padding around the chat
         child: Chat(
           messages: messages, // Passes the list of messages to the chat widget
-          onSendPressed: _handleSendPressed, // Callback when user sends a message
+          onSendPressed:
+              _handleSendPressed, // Callback when user sends a message
           user: _user, // Sets the current user
           showUserNames: true, // Displays usernames in the chat
           showUserAvatars: true, // Displays avatars in the chat
-          
+
           // Builds custom avatar for AI user
           avatarBuilder: (user) {
             if (user.id == 'AI') {
               return CircleAvatar(
-                backgroundImage: AssetImage('assets/aiavatar.jpg'), // AI avatar image
+                backgroundImage:
+                    AssetImage('assets/aiavatar.jpg'), // AI avatar image
                 radius: 20,
-                foregroundColor:  Colors.white,
+                foregroundColor: Colors.white,
               );
             }
             // Default avatar for other users
@@ -138,4 +157,3 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 }
-
