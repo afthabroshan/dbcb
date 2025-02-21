@@ -1,0 +1,74 @@
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import create_engine
+from sqlalchemy.pool import StaticPool
+from langchain_openai import ChatOpenAI
+from langchain_community.utilities.sql_database import SQLDatabase
+from langchain_community.agent_toolkits.sql.base import create_sql_agent
+# from langchain.agents import create_sql_agent
+from langchain.agents.agent_types import AgentType
+from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
+import os
+ 
+ 
+# Load environment variables
+# load_dotenv()
+ 
+
+ 
+openai_api_key = "API_KEY"
+supabase_url = "https://zofdiwijmmeltnrrjxux.supabase.co"
+supabase_db_url = "postgresql://postgres.zofdiwijmmeltnrrjxux:hamdaz%40100123@aws-0-ap-south-1.pooler.supabase.com:5432/postgres"
+ 
+if not openai_api_key:
+    raise ValueError("OpenAI API key is missing. Please set it in .env.")
+ 
+if not supabase_db_url:
+    raise ValueError("Supabase Database URL is missing. Please set it in .env.")
+ 
+# SQLAlchemy database connection (Supabase PostgreSQL)
+engine = create_engine(supabase_db_url, poolclass=StaticPool)
+ 
+# Create SQLDatabase instance
+db = SQLDatabase(engine)
+ 
+# Define OpenAI model
+llm = ChatOpenAI(model="gpt-4o", api_key=openai_api_key)
+ 
+# LangChain SQL Agent with error handling
+agent_executor = create_sql_agent(
+    llm=llm,
+    db=db,
+    agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+    verbose=True,
+    handle_parsing_errors=True,
+    return_intermediate_steps=True
+)
+ 
+app = FastAPI()
+ 
+# CORS configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  #"http://localhost:63903"
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+ 
+class QueryRequest(BaseModel):
+    query: str
+ 
+@app.post("/query")
+async def query_sql(request: QueryRequest):
+    try:
+        response = agent_executor.invoke({"input": request.query})
+        generated_sql = response.get("intermediate_steps", [])[0][1] if response.get("intermediate_steps") else "SQL Query not available."
+        return {"generated_sql": generated_sql, "output": response["output"]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+   
+@app.options("/query")
+async def options_query():
+    return {"Allow": "POST, OPTIONS"}
