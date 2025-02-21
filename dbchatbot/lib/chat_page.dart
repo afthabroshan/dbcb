@@ -34,8 +34,8 @@ class _ChatPageState extends State<ChatPage> {
   // Represents the AI user in the chat
   final _aiUser = const types.User(
     id: 'AI',
-    firstName: 'Al Ottaha',
-    imageUrl: 'assets/ai_avatar.png',
+    firstName: 'DB Chatbot',
+    imageUrl: 'assets/aiavatar.png',
   );
 
   // Adds a new message to the chat
@@ -73,10 +73,6 @@ class _ChatPageState extends State<ChatPage> {
       );
 
       _addMessage(loadingMessage);
-      // setState(() {
-      //   isLoading = true;
-      // });
-      // Fetches data from the 'employees' table in Supabase
       final supabaseResponse =
           await Supabase.instance.client.from('employees').select();
       log('Supabase Response: $supabaseResponse'); // Logs the response
@@ -86,28 +82,6 @@ class _ChatPageState extends State<ChatPage> {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'query': userInput}),
       );
-      // Prepares the request body for OpenAI's API
-      // var requestBody = {
-      //   "model": "gpt-4o", // Specifies the AI model to use
-      //   "messages": [
-      //     {
-      //       "role": "system",
-      //       "content":
-      //           "Your name is Al Ottaha, you only answer about camels, you are a camel expert if asked anything about anything else than camels you say you are unaware of that topic. you randomly act a fool. you only answer what is asked and sound human like"
-      //     },
-      //     {"role": "user", "content": userInput} // User's message
-      //   ]
-      // };
-
-      // Sends a POST request to OpenAI's API
-      // var apiResponse = await http.post(
-      //   Uri.parse("https://api.openai.com/v1/chat/completions"),
-      //   headers: {
-      //     // "Authorization": "Bearer ${dotenv.env['OPENAI_API_KEY']}", // API key for authentication
-      //     "Content-Type": "application/json", // Specifies content type
-      //   },
-      //   body: jsonEncode(requestBody), // Converts request body to JSON
-      // );
 
       // Checks if the request was successful
       if (apiResponse.statusCode == 200) {
@@ -115,9 +89,6 @@ class _ChatPageState extends State<ChatPage> {
             jsonDecode(apiResponse.body); // Decodes the JSON response
         String aiText = jsonResponse['output'];
         log('Query Result: $aiText');
-        // String aiText = jsonResponse['choices'][0]['message']
-        //     ['content']; // Extracts AI's response
-
         // Creates a message object for the AI's response
         final aiMessage = types.TextMessage(
           author: _aiUser, // Sets the author to the AI user
@@ -144,7 +115,7 @@ class _ChatPageState extends State<ChatPage> {
         log("API Error: ${apiResponse.body}"); // Logs error if API call fails
       }
     } catch (e) {
-      print("Error: $e"); // Catches and prints any exceptions
+      log("Error: $e"); // Catches and prints any exceptions
     }
   }
 
@@ -185,39 +156,6 @@ class _ChatPageState extends State<ChatPage> {
                   },
                 ),
               ),
-              // if (isLoading) // Show shimmer only if loading
-              //   Padding(
-              //     padding: const EdgeInsets.all(8.0),
-              //     child: Row(
-              //       mainAxisAlignment: MainAxisAlignment.center,
-              //       children: [
-              //         Shimmer.fromColors(
-              //           baseColor: Colors.grey[300]!,
-              //           highlightColor: Colors.grey[100]!,
-              //           child: Row(
-              //             children: [
-              //               Container(
-              //                 height: 14,
-              //                 width: 14,
-              //                 decoration: BoxDecoration(
-              //                   color: Colors.grey[300],
-              //                   shape: BoxShape.circle,
-              //                 ),
-              //               ),
-              //               SizedBox(width: 10),
-              //               Text(
-              //                 "Al ottaha isthinking hard...",
-              //                 style: TextStyle(
-              //                   fontSize: 14,
-              //                   color: Colors.grey[300],
-              //                 ),
-              //               ),
-              //             ],
-              //           ),
-              //         ),
-              //       ],
-              //     ),
-              //   ),
             ],
           ),
         ));
