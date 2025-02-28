@@ -1,0 +1,111 @@
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import create_engine
+from sqlalchemy.pool import StaticPool
+from langchain_openai import ChatOpenAI
+from langchain_community.utilities.sql_database import SQLDatabase
+from langchain_community.agent_toolkits.sql.base import create_sql_agent
+from langchain.agents.agent_types import AgentType
+from fastapi.middleware.cors import CORSMiddleware
+import os
+
+# Define metadata for database tables
+# This metadata helps in providing context to the AI model
+# so that it understands the structure of the database
+
+table_metadata = {
+    "employee": {
+        "description": "This stores the information of the employees",
+        "columns": {
+            "eid": "Unique identifier for the employee.",
+            "employee_name": "Name of the user.",
+            "position": "Position of the employee",
+            "current_project": "The current project the user is working on.",
+            "salary": "Contains the salary of the employee.",
+            "place": "Contains the place of the employee"
+        }
+    },
+    "user_credentials": {
+        "description": "Contains user username, access data, position, password",
+        "columns": {    
+            "id": "Unique identifier for the user.",
+            "position": "Position of the user",
+            "access_data": "Contains the access data of the users",
+            "password": "Contains the password of the user"
+        }
+    }
+}
+
+# Construct a metadata description string for use in AI processing
+metadata_prompt = "Here is metadata for the database:\n\n"
+for table, details in table_metadata.items():
+    metadata_prompt += f"Table: {table} - {details['description']}\n"
+    for column, desc in details["columns"].items():
+        metadata_prompt += f"   Column: {column} - {desc}\n"
+    metadata_prompt += "\n"
+
+# Define API keys and database URLs (should be set securely)
+openai_api_key = ""
+supabase_db_url = "postgresql://postgres.zofdiwijmmeltnrrjxux:hamdaz%40100123@aws-0-ap-south-1.pooler.supabase.com:5432/postgres"
+
+# Ensure required credentials are set
+if not openai_api_key:
+    raise ValueError("OpenAI API key is missing. Please set it in .env.")
+ 
+if not supabase_db_url:
+    raise ValueError("Supabase Database URL is missing. Please set it in .env.")
+
+# Establish connection to the PostgreSQL database using SQLAlchemy
+engine = create_engine(supabase_db_url, poolclass=StaticPool)
+
+# Create an instance of SQLDatabase from LangChain
+# This allows AI-powered interactions with the SQL database
+db = SQLDatabase(engine)
+
+# Initialize the OpenAI model
+llm = ChatOpenAI(model="gpt-4o", api_key=openai_api_key)
+
+# Create the LangChain SQL Agent
+# This agent is responsible for executing SQL queries based on natural language prompts
+agent_executor = create_sql_agent(
+    llm=llm,
+    db=db,
+    agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+    verbose=True,
+    handle_parsing_errors=True,
+    return_intermediate_steps=True,  # Enables capturing SQL queries generated during processing
+    system_message=table_metadata  # Provides metadata to the agent for better query understanding
+)
+
+# Initialize FastAPI application
+app = FastAPI()
+
+# Configure CORS (Cross-Origin Resource Sharing)
+# This allows external clients to access the API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all HTTP methods
+    allow_headers=["*"],  # Allows all headers
+)
+
+# Define a request model using Pydantic for query input validation
+class QueryRequest(BaseModel):
+    query: str  # The SQL query or natural language query to be processed
+
+# Endpoint to process SQL queries through the AI agent
+@app.post("/query")
+async def query_sql(request: QueryRequest):
+    try:
+        print(f"Received query: {request.query}")  # Log the incoming query
+        
+        # Invoke the LangChain agent with the user query
+        response = agent_executor.invoke({"input": request.query})
+        
+        # Extract the generated SQL query (if available)
+        generated_sql = response.get("intermediate_steps", [])[0][1] if response.get("intermediate_steps") else "SQL Query not available."
+        
+        return {"generated_sql": generated_sql, "output": response["output"]}  # Return the response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))  # Handle errors gracefully
