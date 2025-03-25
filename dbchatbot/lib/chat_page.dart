@@ -80,7 +80,8 @@ class _ChatPageState extends State<ChatPage> {
         Uri.parse(
             'http://localhost:8000/query'), // Ensure this URL matches your FastAPI endpoint  'http://192.168.1.39:8000/query', "http://127.0.0.1:8000/query"
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'query': userInput}),
+        body:
+            jsonEncode({'query': userInput, 'access_data': widget.accessData}),
       );
 
       // Checks if the request was successful
